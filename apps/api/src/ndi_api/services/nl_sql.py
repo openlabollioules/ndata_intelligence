@@ -349,14 +349,18 @@ def _categorize_error(error: str) -> str:
         return "Vérifie que les noms de colonnes existent EXACTEMENT dans le schéma (respecte la casse snake_case)."
     elif "no such table" in error_lower:
         return "Vérifie que le nom de table existe dans le schéma."
-    elif "syntax error" in error_lower:
-        return "Vérifie la syntaxe SQL DuckDB (virgules, parenthèses, guillemets)."
+    elif "parser error" in error_lower or "syntax error" in error_lower:
+        return ("Erreur de syntaxe SQL. Causes fréquentes : "
+                "1) Nom de colonne qui est un mot réservé SQL (at, order, group, date, type, key, value…) → encadre-le avec des guillemets doubles : \"at\", \"order\", \"type\". "
+                "2) Alias avec espaces → utilise des underscores : `as nb_nulls` et non `as null values`. "
+                "3) Virgules manquantes ou parenthèses non fermées. "
+                "Corrige et retourne UNIQUEMENT la requête SQL.")
     elif "ambiguous column" in error_lower:
         return "Précise la table pour cette colonne (format: table.colonne)."
     elif "mismatched columns" in error_lower or "subquery" in error_lower:
         return "Vérifie que les sous-requêtes ont le même nombre de colonnes."
-    elif "group by" in error_lower:
-        return "En GROUP BY, toutes les colonnes du SELECT doivent être agrégées ou dans le GROUP BY."
+    elif "group by" in error_lower or "must appear in the group by" in error_lower or "aggregate function" in error_lower:
+        return "ERREUR GROUP BY : chaque colonne du SELECT qui n'est PAS dans une fonction d'agrégation (SUM, COUNT, AVG, MIN, MAX) DOIT figurer dans la clause GROUP BY. Ajoute les colonnes manquantes au GROUP BY."
     else:
         return "Analyse l'erreur et corrige la requête en respectant strictement le schéma fourni."
 

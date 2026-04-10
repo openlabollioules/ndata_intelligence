@@ -14,6 +14,9 @@ tags: [sql, duckdb, query-generation]
 3. N'effectue des JOINs QUE si une relation est déclarée dans le schéma (relations PK/FK).
 4. Retourne UNIQUEMENT la requête SQL brute, sans explication, sans markdown, sans backticks.
 5. Ne PAS ajouter de `LIMIT` sauf si l'utilisateur demande explicitement un nombre restreint de résultats (ex: "top 10", "les 5 premiers").
+6. **GROUP BY OBLIGATOIRE** : si tu utilises une fonction d'agrégation (SUM, COUNT, AVG, MIN, MAX) avec des colonnes non agrégées dans le SELECT, TOUTES les colonnes non agrégées DOIVENT apparaître dans le GROUP BY. C'est une erreur fréquente — vérifie systématiquement.
+7. **ALIAS SANS ESPACE** : les alias de colonnes (après AS) ne doivent JAMAIS contenir d'espace. Utilise des underscores : `as total_heures`, `as nb_valeurs_nulles`. INTERDIT : `as null values`, `as total heures`.
+8. **GUILLEMETS DOUBLES pour les noms de colonnes** : encadre TOUJOURS les noms de colonnes avec des guillemets doubles `"nom_colonne"`. Cela évite les conflits avec les mots réservés SQL (ex: `at`, `order`, `group`, `date`, `type`, `key`, `value`). Exemple : `SELECT "at", "type" FROM table WHERE "at" IS NOT NULL`.
 
 ## Format de réponse
 

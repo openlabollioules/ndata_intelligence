@@ -24,6 +24,20 @@ _THINK_RE = re.compile(
     re.DOTALL,
 )
 
+# Dangerous HTML tags that should never appear in LLM output
+_DANGEROUS_HTML_RE = re.compile(
+    r"<\s*/?\s*(?:iframe|script|object|embed|form|input|link|meta|style|base|applet)\b[^>]*>",
+    re.IGNORECASE,
+)
+
+
+def strip_dangerous_html(text: str) -> str:
+    """Remove dangerous HTML tags (iframe, script, etc.) from LLM output."""
+    cleaned = _DANGEROUS_HTML_RE.sub("", text)
+    if cleaned != text:
+        logger.warning("Stripped dangerous HTML from LLM output")
+    return cleaned
+
 
 def strip_thinking(text: str) -> str:
     """Remove chain-of-thought / thinking blocks from LLM output.
@@ -40,7 +54,42 @@ def strip_thinking(text: str) -> str:
     if "</think>" in cleaned:
         cleaned = cleaned.split("</think>")[-1]
 
+    # Always strip dangerous HTML from LLM output
+    cleaned = strip_dangerous_html(cleaned)
+
     return cleaned.strip()
+
+
+_SQL_KEYWORDS = {
+    "select", "from", "where", "group", "order", "having", "limit",
+    "join", "left", "right", "inner", "outer", "on", "and", "or",
+    "as", "by", "in", "is", "not", "null", "between", "like", "ilike",
+    "case", "when", "then", "else", "end", "with", "union", "distinct",
+    "count", "sum", "avg", "min", "max", "over", "partition",
+}
+
+
+def _fix_sql_aliases(sql: str) -> str:
+    """Fix SQL aliases that contain spaces (e.g. 'as null values' → 'as null_values').
+
+    Only joins words that are NOT SQL keywords, to avoid merging
+    'as colonne FROM table' into 'as colonne_FROM_table'.
+    """
+    def _replace_alias(m: re.Match) -> str:
+        word1 = m.group(1)
+        word2 = m.group(2)
+        # Don't merge if the second word is a SQL keyword
+        if word2.lower() in _SQL_KEYWORDS:
+            return m.group(0)  # leave unchanged
+        return f" as {word1}_{word2}"
+
+    # Match: AS <word> <word> — exactly two non-keyword words
+    return re.sub(
+        r"\bas\s+([a-zA-Z_]\w*)\s+([a-zA-Z_]\w*)(?=\s*(?:,|\bFROM\b|\bGROUP\b|\bORDER\b|\bHAVING\b|\bWHERE\b|\bLIMIT\b|\)|$))",
+        _replace_alias,
+        sql,
+        flags=re.IGNORECASE,
+    )
 
 
 def extract_sql(text: str) -> str:
@@ -54,7 +103,7 @@ def extract_sql(text: str) -> str:
     # 1. Try markdown code block (```sql ... ``` or ``` ... ```)
     code_match = re.search(r"```(?:sql)?\s*\n?(.*?)```", cleaned, re.DOTALL | re.IGNORECASE)
     if code_match:
-        return code_match.group(1).strip()
+        return _fix_sql_aliases(code_match.group(1).strip())
 
     # 2. Try to find SELECT/WITH statement in the text
     sql_match = re.search(
@@ -63,7 +112,7 @@ def extract_sql(text: str) -> str:
         re.DOTALL | re.IGNORECASE,
     )
     if sql_match:
-        return sql_match.group(1).strip().rstrip(";").strip()
+        return _fix_sql_aliases(sql_match.group(1).strip().rstrip(";").strip())
 
     # 3. Try JSON object (for NoSQL mode)
     json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)

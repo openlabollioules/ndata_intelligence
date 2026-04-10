@@ -2,6 +2,7 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { SmartTable, parseMarkdownTable } from "./smart-table";
 
@@ -26,13 +27,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     return (
       <div className="text-sm">
         {beforeTable && (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={components}>
             {beforeTable}
           </ReactMarkdown>
         )}
         <SmartTable headers={tableData.headers} rows={tableData.rows} />
         {afterTable && (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={components}>
             {afterTable}
           </ReactMarkdown>
         )}
@@ -41,7 +42,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={components}>
       {content}
     </ReactMarkdown>
   );

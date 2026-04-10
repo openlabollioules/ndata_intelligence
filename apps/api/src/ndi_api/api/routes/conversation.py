@@ -10,6 +10,7 @@ Provides endpoints for:
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
@@ -107,6 +108,18 @@ _INGEST_KEYWORDS = [
 ]
 
 
+_QUALITY_RE = re.compile(
+    r"\b(qualité|qualite|quality|manquant|null|vide|doublon|duplicate|"
+    r"outlier|aberrant|anomalie|complétude|audit|propreté)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_quality_intent(question: str) -> bool:
+    """Detect whether the user wants a data quality audit."""
+    return bool(_QUALITY_RE.search(question))
+
+
 def _is_ingest_intent(question: str) -> bool:
     """Detect whether the user wants to ingest previously extracted data."""
     q = question.lower()
@@ -141,6 +154,11 @@ async def conversational_query(request: QueryRequest) -> QueryResponse:
         if session.pending_table and _is_ingest_intent(request.question):
             result = await _handle_pending_ingest(session, request.question)
             question_type = "image_ingest"
+        elif _is_quality_intent(request.question):
+            # Quality audit takes priority — route directly to open_analysis
+            # so the SkillRouter can resolve the data-quality skill.
+            question_type = "open_analysis"
+            result = await _handle_open_analysis(request.question, session)
         else:
             router_instance = get_question_router()
             routing = router_instance.route(request.question, session)
